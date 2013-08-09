@@ -13,6 +13,10 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 			this._map
 				.on('mousedown', this._onMouseDown, this)
 				.on('mousemove', this._onMouseMove, this);
+
+			L.DomEvent
+				.on(this._container, 'touchstart', this._onTouchStart, this)
+				.on(this._container, 'touchmove', this._onTouchMove, this);
 		}
 	},
 
@@ -27,7 +31,12 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 				.off('mousedown', this._onMouseDown, this)
 				.off('mousemove', this._onMouseMove, this);
 
+			L.DomEvent
+				.off(this._container, 'touchstart', this._onTouchStart)
+				.off(this._container, 'touchmove', this._onTouchMove);
+
 			L.DomEvent.off(document, 'mouseup', this._onMouseUp);
+			L.DomEvent.off(document, 'touchend', this._onTouchEnd);
 
 			// If the box element doesn't exist they must not have moved the mouse, so don't need to destroy/return
 			if (this._shape) {
@@ -44,6 +53,7 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 
 		L.DomEvent
 			.on(document, 'mouseup', this._onMouseUp, this)
+			.on(document, 'touchend', this._onTouchEnd, this)
 			.preventDefault(e.originalEvent);
 	},
 
@@ -63,5 +73,41 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 		}
 
 		this.disable();
+	},
+
+	_onTouchStart: function (e) {
+		e.preventDefault();
+		if (e.touches.length === 1) {
+			var touch = e.touches[0];
+			var mouseEvent = this._createMouseEvent(touch);
+			this._onMouseDown(mouseEvent);
+		}
+	},
+
+	_onTouchMove: function (e) {
+		e.preventDefault();
+		if (e.touches.length === 1) {
+			var touch = e.touches[0];
+			var mouseEvent = this._createMouseEvent(touch);
+			this._onMouseMove(mouseEvent);
+		}
+	},
+
+	_onTouchEnd: function (e) {
+		this._onMouseUp(e);
+	},
+
+	_createMouseEvent: function (e) {
+		var containerPoint = this._map.mouseEventToContainerPoint(e),
+			layerPoint = this._map.containerPointToLayerPoint(containerPoint),
+			latlng = this._map.layerPointToLatLng(layerPoint);
+		return {
+			latlng: latlng,
+			layerPoint: layerPoint,
+			containerPoint: containerPoint,
+			originalEvent: e
+		};
 	}
+
+
 });

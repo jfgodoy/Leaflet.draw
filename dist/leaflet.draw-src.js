@@ -189,7 +189,7 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 			timeout: 2500
 		},
 		icon: new L.DivIcon({
-			iconSize: new L.Point(8, 8),
+			iconSize: L.Browser.touch ? new L.Point(20, 20) : new L.Point(8, 8),
 			className: 'leaflet-div-icon leaflet-editing-icon'
 		}),
 		guidelineDistance: 20,
@@ -246,6 +246,10 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 				});
 			}
 
+			if (L.Browser.touch) {
+				this._map.on('contextmenu', this._onLongTouch, this);
+			}
+
 			this._mouseMarker
 				.on('click', this._onClick, this)
 				.addTo(this._map);
@@ -277,6 +281,10 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 
 		// clean up DOM
 		this._clearGuides();
+
+		if (L.Browser.touch) {
+			this._map.off('contextmenu', this._onLongTouch, this);
+		}
 
 		this._map
 			.off('mousemove', this._onMouseMove, this)
@@ -325,7 +333,7 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 	},
 
 	_onClick: function (e) {
-		var latlng = e.target.getLatLng(),
+		var latlng = e.latlng,
 			markerCount = this._markers.length;
 
 		if (markerCount > 0 && !this.options.allowIntersection && this._poly.newLatLngIntersects(latlng)) {
@@ -351,6 +359,11 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 		this._clearGuides();
 
 		this._updateTooltip();
+	},
+
+	_onLongTouch: function (e) {
+		this._onMouseMove(e);
+		this._onClick(e);
 	},
 
 	_updateFinishHandler: function () {
@@ -706,6 +719,10 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 			this._map
 				.on('mousedown', this._onMouseDown, this)
 				.on('mousemove', this._onMouseMove, this);
+
+			L.DomEvent
+				.on(this._container, 'touchstart', this._onTouchStart, this)
+				.on(this._container, 'touchmove', this._onTouchMove, this);
 		}
 	},
 
@@ -720,7 +737,12 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 				.off('mousedown', this._onMouseDown, this)
 				.off('mousemove', this._onMouseMove, this);
 
+			L.DomEvent
+				.off(this._container, 'touchstart', this._onTouchStart)
+				.off(this._container, 'touchmove', this._onTouchMove);
+
 			L.DomEvent.off(document, 'mouseup', this._onMouseUp);
+			L.DomEvent.off(document, 'touchend', this._onTouchEnd);
 
 			// If the box element doesn't exist they must not have moved the mouse, so don't need to destroy/return
 			if (this._shape) {
@@ -737,6 +759,7 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 
 		L.DomEvent
 			.on(document, 'mouseup', this._onMouseUp, this)
+			.on(document, 'touchend', this._onTouchEnd, this)
 			.preventDefault(e.originalEvent);
 	},
 
@@ -756,7 +779,43 @@ L.Draw.SimpleShape = L.Draw.Feature.extend({
 		}
 
 		this.disable();
+	},
+
+	_onTouchStart: function (e) {
+		e.preventDefault();
+		if (e.touches.length === 1) {
+			var touch = e.touches[0];
+			var mouseEvent = this._createMouseEvent(touch);
+			this._onMouseDown(mouseEvent);
+		}
+	},
+
+	_onTouchMove: function (e) {
+		e.preventDefault();
+		if (e.touches.length === 1) {
+			var touch = e.touches[0];
+			var mouseEvent = this._createMouseEvent(touch);
+			this._onMouseMove(mouseEvent);
+		}
+	},
+
+	_onTouchEnd: function (e) {
+		this._onMouseUp(e);
+	},
+
+	_createMouseEvent: function (e) {
+		var containerPoint = this._map.mouseEventToContainerPoint(e),
+			layerPoint = this._map.containerPointToLayerPoint(containerPoint),
+			latlng = this._map.layerPointToLatLng(layerPoint);
+		return {
+			latlng: latlng,
+			layerPoint: layerPoint,
+			containerPoint: containerPoint,
+			originalEvent: e
+		};
 	}
+
+
 });
 
 L.Draw.Rectangle = L.Draw.SimpleShape.extend({
@@ -884,6 +943,11 @@ L.Draw.Marker = L.Draw.Feature.extend({
 		if (this._map) {
 			this._tooltip.updateContent({ text: L.drawLocal.draw.handlers.marker.tooltip.start });
 
+			if (L.Browser.touch) {
+				this._map.on('contextmenu', this._onLongTouch, this);
+				return;
+			}
+
 			// Same mouseMarker as in Draw.Polyline
 			if (!this._mouseMarker) {
 				this._mouseMarker = L.marker(this._map.getCenter(), {
@@ -909,6 +973,18 @@ L.Draw.Marker = L.Draw.Feature.extend({
 		L.Draw.Feature.prototype.removeHooks.call(this);
 
 		if (this._map) {
+
+			if (L.Browser.touch) {
+				this._map.off('contextmenu', this._onLongTouch, this);
+
+				if (this._marker) {
+					this._map.removeLayer(this._marker);
+					delete this._marker;
+				}
+
+				return;
+			}
+
 			if (this._marker) {
 				this._marker.off('click', this._onClick, this);
 				this._map
@@ -953,6 +1029,21 @@ L.Draw.Marker = L.Draw.Feature.extend({
 		this.disable();
 	},
 
+	_onLongTouch: function (e) {
+		var latlng = e.latlng;
+
+		this._marker = new L.Marker(latlng, {
+			icon: this.options.icon,
+			zIndexOffset: this.options.zIndexOffset
+		});
+
+		this._map.addLayer(this._marker);
+
+		this._fireCreatedEvent();
+		this.disable();
+	},
+
+
 	_fireCreatedEvent: function () {
 		var marker = new L.Marker(this._marker.getLatLng(), { icon: this.options.icon });
 		L.Draw.Feature.prototype._fireCreatedEvent.call(this, marker);
@@ -968,7 +1059,7 @@ L.Edit = L.Edit || {};
 L.Edit.Poly = L.Handler.extend({
 	options: {
 		icon: new L.DivIcon({
-			iconSize: new L.Point(8, 8),
+			iconSize: L.Browser.touch ? new L.Point(30, 30) : new L.Point(8, 8),
 			className: 'leaflet-div-icon leaflet-editing-icon'
 		})
 	},
@@ -1233,11 +1324,11 @@ L.Edit = L.Edit || {};
 L.Edit.SimpleShape = L.Handler.extend({
 	options: {
 		moveIcon: new L.DivIcon({
-			iconSize: new L.Point(8, 8),
+			iconSize: L.Browser.touch ? new L.Point(30, 30) : new L.Point(8, 8),
 			className: 'leaflet-div-icon leaflet-editing-icon leaflet-edit-move'
 		}),
 		resizeIcon: new L.DivIcon({
-			iconSize: new L.Point(8, 8),
+			iconSize: L.Browser.touch ? new L.Point(30, 30) : new L.Point(8, 8),
 			className: 'leaflet-div-icon leaflet-editing-icon leaflet-edit-resize'
 		})
 	},

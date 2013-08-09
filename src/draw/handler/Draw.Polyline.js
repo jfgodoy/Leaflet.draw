@@ -13,7 +13,7 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 			timeout: 2500
 		},
 		icon: new L.DivIcon({
-			iconSize: new L.Point(8, 8),
+			iconSize: L.Browser.touch ? new L.Point(20, 20) : new L.Point(8, 8),
 			className: 'leaflet-div-icon leaflet-editing-icon'
 		}),
 		guidelineDistance: 20,
@@ -70,6 +70,10 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 				});
 			}
 
+			if (L.Browser.touch) {
+				this._map.on('contextmenu', this._onLongTouch, this);
+			}
+
 			this._mouseMarker
 				.on('click', this._onClick, this)
 				.addTo(this._map);
@@ -101,6 +105,10 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 
 		// clean up DOM
 		this._clearGuides();
+
+		if (L.Browser.touch) {
+			this._map.off('contextmenu', this._onLongTouch, this);
+		}
 
 		this._map
 			.off('mousemove', this._onMouseMove, this)
@@ -149,7 +157,7 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 	},
 
 	_onClick: function (e) {
-		var latlng = e.target.getLatLng(),
+		var latlng = e.latlng,
 			markerCount = this._markers.length;
 
 		if (markerCount > 0 && !this.options.allowIntersection && this._poly.newLatLngIntersects(latlng)) {
@@ -175,6 +183,11 @@ L.Draw.Polyline = L.Draw.Feature.extend({
 		this._clearGuides();
 
 		this._updateTooltip();
+	},
+
+	_onLongTouch: function (e) {
+		this._onMouseMove(e);
+		this._onClick(e);
 	},
 
 	_updateFinishHandler: function () {

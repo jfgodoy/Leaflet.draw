@@ -7,7 +7,7 @@ L.Edit = L.Edit || {};
 L.Edit.Poly = L.Handler.extend({
 	options: {
 		icon: new L.DivIcon({
-			iconSize: new L.Point(8, 8),
+			iconSize: L.Browser.touch ? new L.Point(30, 30) : new L.Point(8, 8),
 			className: 'leaflet-div-icon leaflet-editing-icon'
 		})
 	},

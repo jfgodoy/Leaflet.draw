@@ -21,6 +21,11 @@ L.Draw.Marker = L.Draw.Feature.extend({
 		if (this._map) {
 			this._tooltip.updateContent({ text: L.drawLocal.draw.handlers.marker.tooltip.start });
 
+			if (L.Browser.touch) {
+				this._map.on('contextmenu', this._onLongTouch, this);
+				return;
+			}
+
 			// Same mouseMarker as in Draw.Polyline
 			if (!this._mouseMarker) {
 				this._mouseMarker = L.marker(this._map.getCenter(), {
@@ -46,6 +51,18 @@ L.Draw.Marker = L.Draw.Feature.extend({
 		L.Draw.Feature.prototype.removeHooks.call(this);
 
 		if (this._map) {
+
+			if (L.Browser.touch) {
+				this._map.off('contextmenu', this._onLongTouch, this);
+
+				if (this._marker) {
+					this._map.removeLayer(this._marker);
+					delete this._marker;
+				}
+
+				return;
+			}
+
 			if (this._marker) {
 				this._marker.off('click', this._onClick, this);
 				this._map
@@ -89,6 +106,21 @@ L.Draw.Marker = L.Draw.Feature.extend({
 
 		this.disable();
 	},
+
+	_onLongTouch: function (e) {
+		var latlng = e.latlng;
+
+		this._marker = new L.Marker(latlng, {
+			icon: this.options.icon,
+			zIndexOffset: this.options.zIndexOffset
+		});
+
+		this._map.addLayer(this._marker);
+
+		this._fireCreatedEvent();
+		this.disable();
+	},
+
 
 	_fireCreatedEvent: function () {
 		var marker = new L.Marker(this._marker.getLatLng(), { icon: this.options.icon });
