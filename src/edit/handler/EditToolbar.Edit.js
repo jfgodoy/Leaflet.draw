@@ -30,7 +30,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 		L.Handler.prototype.enable.call(this);
 
 		this._featureGroup
-			.on('layeradd', this._enableLayerEdit, this)
+			.on('click', this._enableLayerEdit, this)
 			.on('layerremove', this._disableLayerEdit, this);
 
 		this.fire('enabled', {handler: this.type});
@@ -42,7 +42,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 		this.fire('disabled', {handler: this.type});
 
 		this._featureGroup
-			.off('layeradd', this._enableLayerEdit, this)
+			.off('click', this._enableLayerEdit, this)
 			.off('layerremove', this._disableLayerEdit, this);
 
 		L.Handler.prototype.disable.call(this);
@@ -50,7 +50,6 @@ L.EditToolbar.Edit = L.Handler.extend({
 
 	addHooks: function () {
 		if (this._map) {
-			this._featureGroup.eachLayer(this._enableLayerEdit, this);
 
 			this._tooltip = new L.Tooltip(this._map);
 			this._tooltip.updateContent({
@@ -135,6 +134,10 @@ L.EditToolbar.Edit = L.Handler.extend({
 	_enableLayerEdit: function (e) {
 		var layer = e.layer || e.target || e,
 			pathOptions;
+
+		if (layer.editing.enabled()) {
+			return;
+		}
 
 		// Back up this layer (if haven't before)
 		this._backupLayer(layer);
