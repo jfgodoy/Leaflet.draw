@@ -25,7 +25,8 @@ var deps = {
 			'edit/handler/Edit.Poly.js',
 			'edit/handler/Edit.SimpleShape.js',
 			'edit/handler/Edit.Rectangle.js',
-			'edit/handler/Edit.Circle.js'
+			'edit/handler/Edit.Circle.js',
+			'edit/handler/Edit.Marker.js'
 		],
 		desc: 'Editing handlers for: polylines, polygons, rectangles, and circles.',
 		deps: ['Core']
