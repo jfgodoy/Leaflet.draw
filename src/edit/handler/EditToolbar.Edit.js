@@ -132,34 +132,6 @@ L.EditToolbar.Edit = L.Handler.extend({
 		}
 	},
 
-	_toggleMarkerHighlight: function (marker) {
-		// This is quite naughty, but I don't see another way of doing it. (short of setting a new icon)
-		var icon = marker._icon;
-
-		icon.style.display = 'none';
-
-		if (L.DomUtil.hasClass(icon, 'leaflet-edit-marker-selected')) {
-			L.DomUtil.removeClass(icon, 'leaflet-edit-marker-selected');
-			// Offset as the border will make the icon move.
-			this._offsetMarker(icon, -4);
-
-		} else {
-			L.DomUtil.addClass(icon, 'leaflet-edit-marker-selected');
-			// Offset as the border will make the icon move.
-			this._offsetMarker(icon, 4);
-		}
-
-		icon.style.display = '';
-	},
-
-	_offsetMarker: function (icon, offset) {
-		var iconMarginTop = parseInt(icon.style.marginTop, 10) - offset,
-			iconMarginLeft = parseInt(icon.style.marginLeft, 10) - offset;
-
-		icon.style.marginTop = iconMarginTop + 'px';
-		icon.style.marginLeft = iconMarginLeft + 'px';
-	},
-
 	_enableLayerEdit: function (e) {
 		var layer = e.layer || e.target || e,
 			pathOptions;
@@ -171,9 +143,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 		if (this._selectedPathOptions) {
 			pathOptions = L.Util.extend({}, this._selectedPathOptions);
 
-			if (layer instanceof L.Marker) {
-				this._toggleMarkerHighlight(layer);
-			} else {
+			if (!layer instanceof L.Marker) {
 				layer.options.previousOptions = layer.options;
 
 				// Make sure that Polylines are not filled
@@ -185,12 +155,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 			}
 		}
 
-		if (layer instanceof L.Marker) {
-			layer.dragging.enable();
-			layer.on('dragend', this._onMarkerDragEnd);
-		} else {
-			layer.editing.enable();
-		}
+		layer.editing.enable();
 	},
 
 	_disableLayerEdit: function (e) {
@@ -199,9 +164,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 
 		// Reset layer styles to that of before select
 		if (this._selectedPathOptions) {
-			if (layer instanceof L.Marker) {
-				this._toggleMarkerHighlight(layer);
-			} else {
+			if (!layer instanceof L.Marker) {
 				// reset the layer style to what is was before being selected
 				layer.setStyle(layer.options.previousOptions);
 				// remove the cached options for the layer object
@@ -209,17 +172,8 @@ L.EditToolbar.Edit = L.Handler.extend({
 			}
 		}
 
-		if (layer instanceof L.Marker) {
-			layer.dragging.disable();
-			layer.off('dragend', this._onMarkerDragEnd, this);
-		} else {
-			layer.editing.disable();
-		}
-	},
+		layer.editing.disable();
 
-	_onMarkerDragEnd: function (e) {
-		var layer = e.target;
-		layer.edited = true;
 	},
 
 	_onMouseMove: function (e) {

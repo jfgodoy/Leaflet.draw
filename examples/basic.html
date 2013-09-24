@@ -16,6 +16,7 @@
 	<script src="../src/edit/handler/Edit.SimpleShape.js"></script>
 	<script src="../src/edit/handler/Edit.Circle.js"></script>
 	<script src="../src/edit/handler/Edit.Rectangle.js"></script>
+	<script src="../src/edit/handler/Edit.Marker.js"></script>
 
 	<script src="../src/draw/handler/Draw.Feature.js"></script>
 	<script src="../src/draw/handler/Draw.Polyline.js"></script>
@@ -74,11 +75,11 @@
 						color: '#662d91'
 					}
 				},
-				marker: false
+				marker: true
 			},
 			edit: {
 				featureGroup: drawnItems,
-				remove: false
+				remove: true
 			}
 		});
 		map.addControl(drawControl);
