@@ -1640,6 +1640,86 @@ L.Circle.addInitHook(function () {
 	});
 });
 
+L.Edit = L.Edit || {};
+
+L.Edit.Marker = L.Handler.extend({
+	options: {
+	},
+
+	initialize: function (marker, options) {
+		this._marker = marker;
+		L.setOptions(this, options);
+	},
+
+	addHooks: function () {
+		this._toggleMarkerHighlight(this._marker);
+		this._marker.dragging.enable();
+		this._marker.on('dragend', this._onMarkerDragEnd);
+	},
+
+	removeHooks: function () {
+		this._toggleMarkerHighlight(this._marker);
+		this._marker.dragging.disable();
+		this._marker.off('dragend', this._onMarkerDragEnd, this);
+	},
+
+	_toggleMarkerHighlight: function (marker) {
+		// This is quite naughty, but I don't see another way of doing it. (short of setting a new icon)
+		var icon = marker._icon;
+
+		icon.style.display = 'none';
+
+		if (L.DomUtil.hasClass(icon, 'leaflet-edit-marker-selected')) {
+			L.DomUtil.removeClass(icon, 'leaflet-edit-marker-selected');
+			// Offset as the border will make the icon move.
+			this._offsetMarker(icon, -4);
+
+		} else {
+			L.DomUtil.addClass(icon, 'leaflet-edit-marker-selected');
+			// Offset as the border will make the icon move.
+			this._offsetMarker(icon, 4);
+		}
+
+		icon.style.display = '';
+	},
+
+	_offsetMarker: function (icon, offset) {
+		var iconMarginTop = parseInt(icon.style.marginTop, 10) - offset,
+			iconMarginLeft = parseInt(icon.style.marginLeft, 10) - offset;
+
+		icon.style.marginTop = iconMarginTop + 'px';
+		icon.style.marginLeft = iconMarginLeft + 'px';
+	},
+
+	_onMarkerDragEnd: function (e) {
+		var layer = e.target;
+		layer.edited = true;
+	}
+
+});
+
+L.Marker.addInitHook(function () {
+	if (L.Edit.Marker) {
+		this.editing = new L.Edit.Marker(this);
+
+		if (this.options.editable) {
+			this.editing.enable();
+		}
+	}
+
+	this.on('add', function () {
+		if (this.editing && this.editing.enabled()) {
+			this.editing.addHooks();
+		}
+	});
+
+	this.on('remove', function () {
+		if (this.editing && this.editing.enabled()) {
+			this.editing.removeHooks();
+		}
+	});
+});
+
 /*
  * L.LatLngUtil contains different utility functions for LatLngs.
  */
@@ -2415,7 +2495,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 		L.Handler.prototype.enable.call(this);
 
 		this._featureGroup
-			.on('layeradd', this._enableLayerEdit, this)
+			.on('click', this._enableLayerEdit, this)
 			.on('layerremove', this._disableLayerEdit, this);
 
 		this.fire('enabled', {handler: this.type});
@@ -2427,7 +2507,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 		this.fire('disabled', {handler: this.type});
 
 		this._featureGroup
-			.off('layeradd', this._enableLayerEdit, this)
+			.off('click', this._enableLayerEdit, this)
 			.off('layerremove', this._disableLayerEdit, this);
 
 		L.Handler.prototype.disable.call(this);
@@ -2435,7 +2515,6 @@ L.EditToolbar.Edit = L.Handler.extend({
 
 	addHooks: function () {
 		if (this._map) {
-			this._featureGroup.eachLayer(this._enableLayerEdit, this);
 
 			this._tooltip = new L.Tooltip(this._map);
 			this._tooltip.updateContent({
@@ -2517,37 +2596,13 @@ L.EditToolbar.Edit = L.Handler.extend({
 		}
 	},
 
-	_toggleMarkerHighlight: function (marker) {
-		// This is quite naughty, but I don't see another way of doing it. (short of setting a new icon)
-		var icon = marker._icon;
-
-		icon.style.display = 'none';
-
-		if (L.DomUtil.hasClass(icon, 'leaflet-edit-marker-selected')) {
-			L.DomUtil.removeClass(icon, 'leaflet-edit-marker-selected');
-			// Offset as the border will make the icon move.
-			this._offsetMarker(icon, -4);
-
-		} else {
-			L.DomUtil.addClass(icon, 'leaflet-edit-marker-selected');
-			// Offset as the border will make the icon move.
-			this._offsetMarker(icon, 4);
-		}
-
-		icon.style.display = '';
-	},
-
-	_offsetMarker: function (icon, offset) {
-		var iconMarginTop = parseInt(icon.style.marginTop, 10) - offset,
-			iconMarginLeft = parseInt(icon.style.marginLeft, 10) - offset;
-
-		icon.style.marginTop = iconMarginTop + 'px';
-		icon.style.marginLeft = iconMarginLeft + 'px';
-	},
-
 	_enableLayerEdit: function (e) {
 		var layer = e.layer || e.target || e,
 			pathOptions;
+
+		if (layer.editing.enabled()) {
+			return;
+		}
 
 		// Back up this layer (if haven't before)
 		this._backupLayer(layer);
@@ -2556,9 +2611,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 		if (this._selectedPathOptions) {
 			pathOptions = L.Util.extend({}, this._selectedPathOptions);
 
-			if (layer instanceof L.Marker) {
-				this._toggleMarkerHighlight(layer);
-			} else {
+			if (!layer instanceof L.Marker) {
 				layer.options.previousOptions = layer.options;
 
 				// Make sure that Polylines are not filled
@@ -2570,12 +2623,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 			}
 		}
 
-		if (layer instanceof L.Marker) {
-			layer.dragging.enable();
-			layer.on('dragend', this._onMarkerDragEnd);
-		} else {
-			layer.editing.enable();
-		}
+		layer.editing.enable();
 	},
 
 	_disableLayerEdit: function (e) {
@@ -2584,9 +2632,7 @@ L.EditToolbar.Edit = L.Handler.extend({
 
 		// Reset layer styles to that of before select
 		if (this._selectedPathOptions) {
-			if (layer instanceof L.Marker) {
-				this._toggleMarkerHighlight(layer);
-			} else {
+			if (!layer instanceof L.Marker) {
 				// reset the layer style to what is was before being selected
 				layer.setStyle(layer.options.previousOptions);
 				// remove the cached options for the layer object
@@ -2594,17 +2640,8 @@ L.EditToolbar.Edit = L.Handler.extend({
 			}
 		}
 
-		if (layer instanceof L.Marker) {
-			layer.dragging.disable();
-			layer.off('dragend', this._onMarkerDragEnd, this);
-		} else {
-			layer.editing.disable();
-		}
-	},
+		layer.editing.disable();
 
-	_onMarkerDragEnd: function (e) {
-		var layer = e.target;
-		layer.edited = true;
 	},
 
 	_onMouseMove: function (e) {
